@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>AI 뉴스 요약 & 투자 조언</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+
+        <header>
+            <h1>📈 AI 뉴스 분석 & 투자 조언</h1>
+            <p>Gemini 기반 실시간 금융 분석 서비스</p>
+        </header>
+
+        <section class="input-box">
+            <input id="newsUrl" type="text" placeholder="뉴스 URL을 입력하세요">
+
+            <div class="profile-row">
+                <select id="experience">
+                    <option value="초보">초보</option>
+                    <option value="중급">중급</option>
+                    <option value="상급">상급</option>
+                </select>
+
+                <select id="risk">
+                    <option value="낮음">낮음</option>
+                    <option value="보통">보통</option>
+                    <option value="높음">높음</option>
+                </select>
+            </div>
+
+            <input id="budget" type="number" placeholder="투자 예산(원) 입력">
+
+            <button onclick="summarizeNews()">AI 분석 요청</button>
+        </section>
+
+        <div id="loader" class="loader hidden">AI 분석 중입니다...</div>
+
+        <section id="chatArea" class="chat-area"></section>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
