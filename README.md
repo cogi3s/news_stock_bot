@@ -1,1 +1,1 @@
-# news_stock_bot
+# news_stock_botd
