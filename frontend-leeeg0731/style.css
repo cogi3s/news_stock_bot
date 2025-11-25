@@ -1,0 +1,86 @@
+body {
+    background: #f5f7fa;
+    margin: 0;
+    font-family: 'Inter', 'Noto Sans KR', sans-serif;
+}
+
+.app-container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 25px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+header h1 {
+    font-size: 28px;
+    margin-bottom: 5px;
+    color: #1b1b1b;
+}
+
+header p {
+    color: #4b5563;
+    font-size: 15px;
+}
+
+.input-box {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.07);
+    margin-bottom: 20px;
+}
+
+.input-box input, .input-box select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 15px;
+}
+
+button {
+    width: 100%;
+    padding: 14px;
+    background: #0057e7;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 17px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+button:hover {
+    background: #003cb9;
+}
+
+.loader {
+    text-align: center;
+    padding: 10px;
+    margin-top: 15px;
+    font-size: 18px;
+}
+
+.chat-area {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.chat-bubble {
+    background: white;
+    padding: 18px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.chat-bubble h2 {
+    margin-top: 0;
+    font-size: 20px;
+    color: #0057e7;
+}
