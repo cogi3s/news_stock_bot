@@ -32,11 +32,26 @@ def search_news(query):
 # ---------------------------------------------------
 def extract_article(url):
     try:
-        r = requests.get(url, timeout=6)
-        soup = BeautifulSoup(r.text, "html.parser")
-        texts = [p.get_text().strip() for p in soup.find_all("p")]
-        return "\n".join(texts)
-    except:
+        res = requests.get(url, timeout=6, headers={
+            "User-Agent": "Mozilla/5.0"
+        })
+        soup = BeautifulSoup(res.text, "html.parser")
+
+        # PC 네이버 본문
+        article = soup.select_one("#dic_area")
+        if article:
+            return article.get_text(separator="\n").strip()
+
+        # 모바일 네이버 본문
+        body = soup.select_one("div#newsct_article")
+        if body:
+            return body.get_text(separator="\n").strip()
+
+        # fallback
+        paragraphs = soup.find_all("p")
+        return "\n".join(p.get_text().strip() for p in paragraphs)
+
+    except Exception:
         return None
 
 
@@ -45,32 +60,120 @@ def extract_article(url):
 # ---------------------------------------------------
 def summarize(text):
     prompt = f"""
-    다음 기사를 3줄로 요약해줘.
-    - 핵심만 간단히
-    - 1분 안에 읽기 좋게
+    당신은 전문 뉴스 에디터이자 재무 분석가입니다.
 
-    기사내용:
+    아래 기사를 기반으로 핵심 내용을 3~4문장으로 요약하고,
+    투자 관점에서 도움이 되는 인사이트를 제공합니다.
+
+    ✦ 요약 규칙 ✦
+    - 핵심 주장, 원인, 결과, 수치 포함
+    - 광고/저작권/구독 안내 제거
+    - 중립적이고 간결하게 작성
+    - 마지막에 '투자자 관점 분석' 포함
+
+    ✦ 출력 형식 ✦
+    📌 핵심 요약:
+    - 3~4문장 요약
+
+    🔍 주요 포인트:
+    - bullet 2~3개
+
+    💹 투자자 관점 분석:
+    - 긍정/부정/중립 판단
+    - 간단한 이유 제시
+    - "투자할만함 / 관망 필요 / 리스크 높음" 중 하나 선택
+
+    ▼ 원문 기사:
     {text}
     """
+
     result = client.models.generate_content(
-    model="gemini-2.0-flash",
-    contents=prompt
-)
+        model="gemini-2.0-flash",
+        contents=prompt
+    )
 
     return result.text
 
 
 # ---------------------------------------------------
-# Streamlit UI
+# Streamlit UI 설정
 # ---------------------------------------------------
-st.set_page_config(page_title="1분 뉴스 요약", layout="wide")
+st.set_page_config(page_title="🌤️ 오늘의 뉴스 브리핑", layout="wide")
 
+
+# ---------------------------------------------------
+# CSS (아침 뉴스 감성 테마)
+# ---------------------------------------------------
 st.markdown("""
-    <h1 style="color:#00b4db; font-size:40px;">📰 1분 뉴스 요약 서비스</h1>
+<style>
+body {
+    background: #f9fafb;
+    font-family: 'Apple SD Gothic Neo', sans-serif;
+}
+
+.title {
+    font-size: 38px;
+    font-weight: 700;
+    padding: 10px 0;
+    background: linear-gradient(90deg, #FFD89B, #FEC863);
+    -webkit-background-clip: text;
+    color: transparent;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+/* 뉴스 카드 */
+.news-card {
+    background: white;
+    padding: 22px;
+    border-radius: 18px;
+    margin-bottom: 25px;
+    border: 1px solid #f0f0f0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+/* 요약 박스 */
+.summary-box {
+    background: #fff7e6;
+    border-left: 4px solid #FFB347;
+    padding: 15px 18px;
+    margin-top: 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* 링크 */
+a.source-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-weight: bold;
+    color: #ff9900;
+    text-decoration: none;
+    font-size: 15px;
+}
+a.source-link:hover {
+    text-decoration: underline;
+}
+</style>
 """, unsafe_allow_html=True)
 
-query = st.text_input("검색어 입력", placeholder="예: 삼성전자, 금리, AI")
 
+# ---------------------------------------------------
+# 메인 타이틀
+# ---------------------------------------------------
+st.markdown('<h1 class="title">🌤️ 오늘의 뉴스 브리핑</h1>', unsafe_allow_html=True)
+
+
+# ---------------------------------------------------
+# 검색 박스
+# ---------------------------------------------------
+query = st.text_input("검색어 입력", placeholder="예: 삼성전자, 금리, AI, 테슬라")
+
+
+# ---------------------------------------------------
+# 검색 처리
+# ---------------------------------------------------
 if query:
     st.info("뉴스를 검색하는 중입니다…⏳")
 
@@ -78,15 +181,23 @@ if query:
     items = data.get("items", [])
 
     for item in items:
-        st.subheader(item["title"])
-        st.write(f"[원문 보기]({item['link']})")
+
+        st.markdown(f"""
+        <div class="news-card">
+            <h3>{item['title']}</h3>
+            <a class="source-link" href="{item['link']}" target="_blank">원문 보기 →</a>
+        """, unsafe_allow_html=True)
 
         article = extract_article(item["link"])
+
         if article:
             summary = summarize(article)
-            st.markdown("---")
-            st.markdown("### 📌 요약 결과")
-            st.write(summary)
-            st.markdown("---")
+            st.markdown(f"""
+            <div class="summary-box">
+                <strong>📌 요약</strong><br>
+                {summary}
+            </div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             st.warning("본문을 가져오지 못했습니다.")
