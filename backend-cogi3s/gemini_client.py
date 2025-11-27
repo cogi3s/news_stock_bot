@@ -1,48 +1,123 @@
 # backend/gemini_client.py
 
+import os
+import json
+from typing import Dict, Any
+
+import google.generativeai as genai
 from models import UserProfile
 
 
-def analyze_news_with_gemini(news_text: str, profile: UserProfile) -> dict:
-    """
-    실제로는 여기서 Gemini API를 호출해서
-    - 뉴스 요약
-    - 주식/섹터 영향 분석
-    - 초보자용 포트폴리오 추천
-    을 받아오게 될 자리.
+# 1) 환경변수에서 API 키 가져와서 설정
+API_KEY = os.getenv("GEMINI_API_KEY")
 
-    지금은 임시 더미 데이터를 리턴해두고
-    나중에 실제 Gemini 연동 코드만 교체하면 됨.
+if not API_KEY:
+  # 터미널에 경고만 찍고, 코드가 완전히 죽지는 않게 처리
+  # (api_key 없으면 뒤에서 더미 데이터 리턴)
+  print("[WARN] GEMINI_API_KEY 환경변수가 설정되어 있지 않습니다.")
+else:
+  genai.configure(api_key=API_KEY)
+
+
+def _build_prompt(news_text: str, profile: UserProfile) -> str:
+  """
+  Gemini에게 보낼 프롬프트 문자열 생성.
+  가능한 한 구조화된 JSON 형태로 답을 달라고 요청한다.
+  """
+  prompt = f"""
+너는 주식 초보자(주린이)를 도와주는 한국어 투자 코치야.
+
+사용자 프로필:
+- 투자 경험 수준: {profile.experience_level}
+- 위험 선호도: {profile.risk_preference}
+- 투자 가능 금액(원): {profile.budget}
+
+아래 뉴스가 주식/ETF/산업 섹터에 어떤 영향을 줄 수 있을지 분석해줘.
+그리고 초보자에게 너무 공격적이지 않게 포트폴리오를 추천해줘.
+
+반드시 아래 JSON 형식으로만 대답해. 다른 말은 쓰지 마.
+형식:
+{{
+  "summary": "뉴스 한 줄 요약",
+  "impact": "주식시장/어떤 섹터에 영향이 있는지 설명",
+  "suggested_portfolio": [
+    {{"name": "자산 이름(예: 국내 대형주 ETF)", "weight": 50}},
+    {{"name": "자산 이름", "weight": 30}},
+    {{"name": "자산 이름", "weight": 20}}
+  ],
+  "risk_comment": "사용자의 경험과 위험 선호를 고려한 코멘트"
+}}
+
+뉴스 원문:
+\"\"\"{news_text}\"\"\"
+"""
+  return prompt
+
+
+def analyze_news_with_gemini(news_text: str, profile: UserProfile) -> Dict[str, Any]:
+    """
+    뉴스 텍스트와 사용자 프로필을 받아서
+    Gemini로 분석한 결과를 dict 형태로 반환.
     """
 
+    # news_text가 비어있으면 더미 응답
     if not news_text.strip():
+      return {
+        "summary": "뉴스 내용이 비어 있습니다.",
+        "impact": "분석할 수 있는 뉴스가 없습니다.",
+        "suggested_portfolio": [],
+        "risk_comment": "먼저 분석할 뉴스를 입력해 주세요."
+}
+
+    # API 키 없는 경우: 더미 응답 (개발 단계용)
+    if not API_KEY:
         return {
-            "summary": "뉴스 내용이 비어 있습니다.",
-            "impact": "분석할 수 있는 뉴스가 없습니다.",
-            "suggested_portfolio": [],
-            "risk_comment": "먼저 뉴스 내용을 입력해 주세요."
+            "summary": "[DEMO] 실제 Gemini API 키가 설정되지 않았습니다.",
+            "impact": "지금은 더미 데이터로만 동작합니다.",
+            "suggested_portfolio": [
+                {"name": "국내 주식 ETF", "weight": 60},
+                {"name": "해외 주식 ETF", "weight": 30},
+                {"name": "현금성 자산", "weight": 10},
+            ],
+            "risk_comment": "API 키를 설정하면 실제 Gemini 분석 결과가 나옵니다."
         }
 
-    # TODO: 여기에 나중에 실제 Gemini 호출 코드 추가
-    # 예시 프롬프트:
-    # prompt = f"""
-    # 너는 초보 투자자를 위한 주식 투자 코치야.
-    # 사용자 프로필: 경험수준={profile.experience_level}, 위험선호={profile.risk_preference}, 예산={profile.budget}
-    # 아래 뉴스가 주식시장에 어떤 영향을 줄지 간단 요약하고,
-    # 너무 위험하지 않은 수준에서 ETF/섹터 위주 포트폴리오를 추천해줘.
-    # 뉴스: {news_text}
-    # """
+    prompt = _build_prompt(news_text, profile)
 
-    # ---- 여기까지가 프롬프트 예시, 실제 API 호출은 나중에 구현 ----
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(prompt)
 
-    # 임시 더미 응답
-    return {
-        "summary": "이 뉴스는 국내 증시에 단기적인 변동성을 줄 수 있는 이슈입니다.",
-        "impact": "특히 IT/반도체 섹터에 주목할 필요가 있습니다.",
-        "suggested_portfolio": [
-            {"name": "국내 대형주 ETF", "weight": 50},
-            {"name": "IT/반도체 ETF", "weight": 30},
-            {"name": "현금성 자산", "weight": 20},
-        ],
-        "risk_comment": f"당신의 투자 경험('{profile.experience_level}')과 위험 선호('{profile.risk_preference}')를 고려해 상대적으로 보수적인 비중으로 구성했습니다."
-    }
+        # Gemini 응답에서 텍스트 꺼내기
+        raw_text = response.text.strip()
+
+        # JSON으로 파싱 시도
+        try:
+            data = json.loads(raw_text)
+        except json.JSONDecodeError:
+            # 모델이 JSON 형식을 살짝 어기더라도 앱이 터지지 않게 예외 처리
+            print("[WARN] Gemini 응답이 JSON 형식이 아님. 원문을 그대로 사용합니다.")
+            data = {
+                "summary": raw_text,
+                "impact": "모델이 JSON 형식을 지키지 않아 원문 전체를 summary로 반환합니다.",
+                "suggested_portfolio": [],
+                "risk_comment": "프롬프트를 조금 더 수정해서 JSON 형식을 강하게 요구해 보세요."
+            }
+
+        # 혹시 빠진 key가 있어도 에러 나지 않게 기본값 채우기
+        return {
+            "summary": data.get("summary", ""),
+            "impact": data.get("impact", ""),
+            "suggested_portfolio": data.get("suggested_portfolio", []),
+            "risk_comment": data.get("risk_comment", "")
+        }
+
+    except Exception as e:
+        # API 호출 에러가 나도 앱이 죽지 않도록 방어
+        print(f"[ERROR] Gemini API 호출 중 오류 발생: {e}")
+        return {
+            "summary": "Gemini API 호출 중 오류가 발생했습니다.",
+            "impact": "잠시 후 다시 시도해 주세요.",
+            "suggested_portfolio": [],
+            "risk_comment": str(e)
+        }

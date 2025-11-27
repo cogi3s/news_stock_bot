@@ -1,17 +1,13 @@
-// frontend/script.js
+const analyzeUrlBtn = document.getElementById("analyze-url-btn");
 
-const analyzeBtn = document.getElementById("analyze-btn");
-const resultEl = document.getElementById("result");
-
-analyzeBtn.addEventListener("click", async () => {
+analyzeUrlBtn.addEventListener("click", async () => {
   const experience = document.getElementById("experience").value;
   const risk = document.getElementById("risk").value;
   const budget = parseInt(document.getElementById("budget").value || "0", 10);
-  const newsText = document.getElementById("news-text").value;
+  const newsUrl = document.getElementById("news-url").value;
 
-  // 간단한 유효성 검사
-  if (!newsText.trim()) {
-    alert("뉴스 내용을 입력해 주세요!");
+  if (!newsUrl.trim()) {
+    alert("뉴스 URL을 입력해 주세요!");
     return;
   }
 
@@ -19,11 +15,11 @@ analyzeBtn.addEventListener("click", async () => {
     experience_level: experience,
     risk_preference: risk,
     budget: budget,
-    news_text: newsText,
+    news_url: newsUrl,
   };
 
   try {
-    const response = await fetch("http://localhost:5000/api/advice", {
+    const response = await fetch("http://localhost:5000/api/advice_from_url", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -37,6 +33,6 @@ analyzeBtn.addEventListener("click", async () => {
     resultEl.textContent = JSON.stringify(data, null, 2);
   } catch (err) {
     console.error(err);
-    resultEl.textContent = "오류가 발생했습니다. 콘솔을 확인해 주세요.";
+    resultEl.textContent = "URL 분석 중 오류가 발생했습니다.";
   }
 });
