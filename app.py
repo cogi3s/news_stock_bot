@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 from google import genai
+import re
+
 
 # ---------------------------------------------------
 # SECRETS (Gemini + Naver API)
@@ -14,7 +16,15 @@ client = genai.Client(api_key=GEMINI_KEY)
 
 
 # ---------------------------------------------------
-# 네이버 뉴스 API 검색 함수
+# HTML 태그 제거 함수 (중요!)
+# ---------------------------------------------------
+def clean_html(raw_text):
+    """Gemini가 실수로 생성한 태그 제거"""
+    return re.sub(r"<.*?>", "", raw_text)
+
+
+# ---------------------------------------------------
+# 네이버 뉴스 API 검색
 # ---------------------------------------------------
 def search_news(query):
     url = "https://openapi.naver.com/v1/search/news.json"
@@ -22,7 +32,7 @@ def search_news(query):
         "X-Naver-Client-Id": NAVER_ID,
         "X-Naver-Client-Secret": NAVER_SECRET
     }
-    params = {"query": query, "display": 5}
+    params = {"query": query, "display": 7}
     res = requests.get(url, headers=headers, params=params)
     return res.json()
 
@@ -32,26 +42,21 @@ def search_news(query):
 # ---------------------------------------------------
 def extract_article(url):
     try:
-        res = requests.get(url, timeout=6, headers={
-            "User-Agent": "Mozilla/5.0"
-        })
+        res = requests.get(url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(res.text, "html.parser")
 
-        # PC 네이버 본문
         article = soup.select_one("#dic_area")
         if article:
             return article.get_text(separator="\n").strip()
 
-        # 모바일 네이버 본문
         body = soup.select_one("div#newsct_article")
         if body:
             return body.get_text(separator="\n").strip()
 
-        # fallback
         paragraphs = soup.find_all("p")
         return "\n".join(p.get_text().strip() for p in paragraphs)
 
-    except Exception:
+    except:
         return None
 
 
@@ -69,6 +74,8 @@ def summarize(text):
     - 핵심 주장, 원인, 결과, 수치 포함
     - 광고/저작권/구독 안내 제거
     - 중립적이고 간결하게 작성
+    - HTML 태그(<div>, </div>, <p>, <br> 등) 절대 생성 금지
+    - 순수 텍스트만 작성
     - 마지막에 '투자자 관점 분석' 포함
 
     ✦ 출력 형식 ✦
@@ -87,30 +94,29 @@ def summarize(text):
     {text}
     """
 
-    result = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt
-    )
+    try:
+        result = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
+        cleaned = clean_html(result.text)
+        return cleaned
 
-    return result.text
+    except Exception as e:
+        return f"[요약 불가] API 오류 발생: {e}"
 
 
 # ---------------------------------------------------
-# Streamlit UI 설정
+# Streamlit UI
 # ---------------------------------------------------
 st.set_page_config(page_title="🌤️ 오늘의 뉴스 브리핑", layout="wide")
 
-
-# ---------------------------------------------------
-# CSS (아침 뉴스 감성 테마)
-# ---------------------------------------------------
 st.markdown("""
 <style>
 body {
     background: #f9fafb;
     font-family: 'Apple SD Gothic Neo', sans-serif;
 }
-
 .title {
     font-size: 38px;
     font-weight: 700;
@@ -121,8 +127,6 @@ body {
     text-align: center;
     margin-bottom: 30px;
 }
-
-/* 뉴스 카드 */
 .news-card {
     background: white;
     padding: 22px;
@@ -131,8 +135,6 @@ body {
     border: 1px solid #f0f0f0;
     box-shadow: 0 4px 12px rgba(0,0,0,0.04);
 }
-
-/* 요약 박스 */
 .summary-box {
     background: #fff7e6;
     border-left: 4px solid #FFB347;
@@ -142,15 +144,12 @@ body {
     font-size: 15px;
     line-height: 1.6;
 }
-
-/* 링크 */
 a.source-link {
     display: inline-block;
     margin-top: 10px;
     font-weight: bold;
     color: #ff9900;
     text-decoration: none;
-    font-size: 15px;
 }
 a.source-link:hover {
     text-decoration: underline;
@@ -159,15 +158,8 @@ a.source-link:hover {
 """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------
-# 메인 타이틀
-# ---------------------------------------------------
 st.markdown('<h1 class="title">🌤️ 오늘의 뉴스 브리핑</h1>', unsafe_allow_html=True)
 
-
-# ---------------------------------------------------
-# 검색 박스
-# ---------------------------------------------------
 query = st.text_input("검색어 입력", placeholder="예: 삼성전자, 금리, AI, 테슬라")
 
 
@@ -182,22 +174,26 @@ if query:
 
     for item in items:
 
+        # 뉴스 카드 헤더
         st.markdown(f"""
         <div class="news-card">
             <h3>{item['title']}</h3>
             <a class="source-link" href="{item['link']}" target="_blank">원문 보기 →</a>
         """, unsafe_allow_html=True)
 
+        # 기사 본문 추출
         article = extract_article(item["link"])
 
         if article:
             summary = summarize(article)
+
             st.markdown(f"""
-            <div class="summary-box">
-                <strong>📌 요약</strong><br>
-                {summary}
-            </div>
-            </div>
-            """, unsafe_allow_html=True)
+<div class="summary-box">
+    <strong>📌 요약</strong><br>
+    {summary}
+</div>
+</div>
+""", unsafe_allow_html=True)
+
         else:
             st.warning("본문을 가져오지 못했습니다.")
